@@ -1,0 +1,24 @@
+# ============================================================
+# Person C - Smart Home Electricity Monitoring & Bill Estimation
+# Copy this file to `.env` and adjust values. NEVER commit the
+# real `.env` file. This file contains PLACEHOLDERS ONLY.
+# ============================================================
+
+# --- Service identity ---
+SERVICE_NAME=smart-home-energy-monitor
+APP_PORT=8003
+
+# --- Database (local SQLite; each project uses its OWN file) ---
+DATABASE_URL=sqlite:///./data/smart_home_energy.db
+# On Render with a mounted disk, use an absolute path instead, e.g.:
+# DATABASE_URL=sqlite:////data/smart_home_energy.db
+
+# --- Frontend (Streamlit) ---
+API_BASE_URL=http://127.0.0.1:8003
+
+# --- Billing analysis ---
+# Deviation threshold (percent) above which /bill/compare flags a month
+# for investigation. D_% = |B_actual - B_estimated| / B_actual * 100.
+DEVIATION_THRESHOLD_PERCENT=10.0
+# Name of the tariff set (see GET /tariffs) used by /bill/estimate.
+DEFAULT_TARIFF=TNEB-Domestic-Monthly-Seed
