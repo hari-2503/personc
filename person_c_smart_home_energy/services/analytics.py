@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from crud import month_bounds
 from models import ActualBill, Appliance, UsageReading
 from services.tariff import estimate_amount, get_tariff_set
 
@@ -46,31 +47,36 @@ def daily_consumption(db: Session, start: date, end: date) -> list[dict]:
 
 
 def monthly_consumption(db: Session, months: int) -> list[dict]:
-    """Totals for the last `months` calendar months that have any data."""
-    rows = (
-        db.execute(
-            select(
-                func.strftime("%Y-%m", UsageReading.reading_date),
-                func.sum(Appliance.rated_power_kw * Appliance.quantity * UsageReading.hours_used),
-                func.count(func.distinct(UsageReading.reading_date)),
-            )
-            .join(Appliance, Appliance.id == UsageReading.appliance_id)
-            .group_by(func.strftime("%Y-%m", UsageReading.reading_date))
-            .order_by(func.strftime("%Y-%m", UsageReading.reading_date).desc())
-            .limit(months)
-        ).all()
-    )
+    """Totals for the last `months` calendar months that have any data.
+
+    Grouped per day in SQL (portable), rolled up to months in Python.
+    """
+    rows = db.execute(
+        select(
+            UsageReading.reading_date,
+            func.sum(Appliance.rated_power_kw * Appliance.quantity * UsageReading.hours_used),
+        )
+        .join(Appliance, Appliance.id == UsageReading.appliance_id)
+        .group_by(UsageReading.reading_date)
+    ).all()
+    by_month: dict[str, dict] = {}
+    for reading_date, total in rows:
+        bucket = by_month.setdefault(reading_date.strftime("%Y-%m"), {"total": 0.0, "days": 0})
+        bucket["total"] += float(total or 0.0)
+        bucket["days"] += 1
+    latest = sorted(by_month, reverse=True)[:months]
     return [
-        {"month": month, "total_kwh": round(float(total or 0.0), 3), "days_with_data": int(days)}
-        for month, total, days in rows
+        {"month": month, "total_kwh": round(by_month[month]["total"], 3), "days_with_data": by_month[month]["days"]}
+        for month in latest
     ]
 
 
 def month_kwh(db: Session, month: str) -> float:
+    start, end = month_bounds(month)
     total = db.scalar(
         select(func.sum(Appliance.rated_power_kw * Appliance.quantity * UsageReading.hours_used))
         .join(UsageReading, UsageReading.appliance_id == Appliance.id)
-        .where(func.strftime("%Y-%m", UsageReading.reading_date) == month)
+        .where(UsageReading.reading_date >= start, UsageReading.reading_date < end)
     )
     return round(float(total or 0.0), 3)
 

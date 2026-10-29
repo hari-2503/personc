@@ -23,7 +23,7 @@ def _get_int(name: str, default: int) -> int:
 class Settings:
     service_name: str = os.getenv("SERVICE_NAME", "smart-home-energy-monitor")
     service_owner: str = "Person C - Hariharan S (23MID0182)"
-    version: str = "1.0.0"
+    version: str = "1.1.0"
     app_port: int = _get_int("APP_PORT", 8003)
 
     # Deviation above this percent (vs actual) flags a month for investigation.

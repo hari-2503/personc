@@ -1,4 +1,5 @@
 """Consumption aggregation endpoints for Person C."""
+import datetime as dt
 from datetime import date, timedelta
 from typing import Optional
 
@@ -18,7 +19,7 @@ MAX_MONTHS = 24
 
 @router.get("/daily", response_model=DailyConsumptionResponse)
 def daily_endpoint(
-    date: Optional[date] = Query(default=None, description="Single day view"),
+    day: Optional[date] = Query(default=None, alias="date", description="Single day view"),
     start: Optional[date] = Query(default=None),
     end: Optional[date] = Query(default=None),
     days: int = Query(default=7, ge=1, le=92, description="Rolling window when start/end omitted"),
@@ -29,10 +30,12 @@ def daily_endpoint(
     E_kWh = rated_power_kw * quantity * hours_used (per reading).
     Days without readings simply do not appear (missing data != zero usage).
     """
-    if date is not None:
-        start = end = date
+    # The query parameter is named "date" publicly but bound to `day` so it
+    # does not shadow the datetime.date type used below.
+    if day is not None:
+        start = end = day
     elif start is None or end is None:
-        end = date.today()
+        end = dt.date.today()
         start = end - timedelta(days=days - 1)
     if start > end:
         raise HTTPException(status_code=422, detail="start must be <= end")

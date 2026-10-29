@@ -1,0 +1,43 @@
+# Render Blueprint for the smart-home-energy-monitor FastAPI backend.
+#
+# The GitHub repository keeps this project in the `person_c_smart_home_energy/` sub-folder, so:
+#   Render dashboard -> New -> Blueprint -> pick the repo ->
+#   Blueprint Path = person_c_smart_home_energy/render.yaml
+# (or copy this file to the repository root - rootDir below stays the same).
+#
+# Database: a Render PostgreSQL instance, because the free web-service disk is
+# ephemeral (SQLite files are wiped on every deploy/restart and free services
+# cannot attach a persistent disk). Free Render Postgres expires 30 days after
+# creation and a workspace may only own one free database - upgrade the plan
+# or recreate it before the expiry date. To use SQLite on a paid instance
+# instead, attach a disk at /var/data and set DATABASE_URL=sqlite:////var/data/smart_home_energy.db
+services:
+  - type: web
+    name: smart-home-energy-monitor
+    runtime: python
+    plan: free
+    rootDir: person_c_smart_home_energy
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: SERVICE_NAME
+        value: smart-home-energy-monitor
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-home-energy-db
+          property: connectionString
+      - key: DEFAULT_TARIFF
+        value: TNEB-Domestic-Monthly-Seed
+      - key: DEVIATION_THRESHOLD_PERCENT
+        value: "10.0"
+
+databases:
+  - name: smart-home-energy-db
+    plan: free
+    databaseName: smart_home_energy
+    user: smart_home_energy
+    ipAllowList: []   # only Render services in the same region/workspace can connect

@@ -2,7 +2,7 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -14,12 +14,19 @@ from schemas import BulkDefaultRequest, BulkDefaultResult, ReadingCreate, Readin
 router = APIRouter(prefix="/readings", tags=["Readings"])
 
 
-@router.post("", response_model=ReadingOut, description="POST is an UPSERT: re-posting the same (appliance_id, reading_date) updates hours_used.")
-def upsert_reading_endpoint(payload: ReadingCreate, db: Session = Depends(get_db)):
+@router.post(
+    "",
+    response_model=ReadingOut,
+    status_code=status.HTTP_201_CREATED,
+    responses={200: {"description": "Existing reading for that appliance/date updated"}},
+    description="POST is an UPSERT on (appliance_id, reading_date): 201 when a reading is created, "
+    "200 when the existing reading's hours_used is replaced.",
+)
+def upsert_reading_endpoint(payload: ReadingCreate, response: Response, db: Session = Depends(get_db)):
     appliance = get_appliance(db, payload.appliance_id)
     if appliance is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Appliance {payload.appliance_id} not found")
-    reading, _created = upsert_reading(
+    reading, created = upsert_reading(
         db,
         appliance_id=payload.appliance_id,
         reading_date=payload.reading_date,
@@ -27,6 +34,8 @@ def upsert_reading_endpoint(payload: ReadingCreate, db: Session = Depends(get_db
         source=payload.source,
     )
     reading.appliance_name = appliance.name  # transient attr for serialization
+    if not created:
+        response.status_code = status.HTTP_200_OK
     return reading
 
 

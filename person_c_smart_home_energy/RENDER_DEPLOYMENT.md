@@ -1,85 +1,98 @@
-# Render Deployment Guide - Person C (Smart Home Energy Monitor)
+# Cloud Deployment - Person C - Smart Home Energy Monitor
 
-Deploy **two Render services from this one repository**: the FastAPI backend
-and the Streamlit dashboard.
+Backend (FastAPI) -> **Render** web service + **Render PostgreSQL**, defined in
+[`render.yaml`](render.yaml).
+Frontend (Streamlit) -> **Streamlit Community Cloud**, talking to the Render
+backend over HTTPS.
 
-## 0. Prerequisites
+Status of this guide: the Blueprint was validated with
+`render blueprints validate` (result `valid: true`) and the backend was run
+locally against PostgreSQL 15 with the full test suite and the live
+end-to-end scenarios. Nothing has been deployed by the maintainers of this
+document - URLs below are placeholders until you deploy.
 
-- The project pushed to a GitHub repo (e.g. `csi3007-smart-home-energy-monitor`),
-  repo root = this folder (`main.py` at top level).
-- A free Render account.
+## 1. Why PostgreSQL and not the SQLite file
 
-## 1. Service 1 - REST API
+Render's free web services have an **ephemeral filesystem** and cannot attach
+a persistent disk, so a SQLite file there is wiped on every deploy, restart
+and spin-down. The Blueprint therefore provisions a Render PostgreSQL
+database and injects its connection string as `DATABASE_URL`
+(`postgres://...` is normalized to the psycopg driver automatically).
 
-1. **New +** -> **Web Service** -> connect the repo.
-2. Settings:
-   - **Runtime**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-   - **Instance Type**: Free (or any)
-3. Environment variables:
+- Free Render Postgres **expires 30 days after creation**, and one workspace
+  can own only one free database. Upgrade the plan or recreate the database
+  before it expires.
+- Paid alternative: an instance with a disk mounted at `/var/data` and
+  `DATABASE_URL=sqlite:////var/data/<name>.db` (remove the `databases:` block).
+- Tables are created on startup; there is no destructive reset. The only
+  schema change in v1.1 is additive (A's `expenses.import_basis`).
 
-   | Key | Value |
-   |---|---|
-   | `SERVICE_NAME` | `smart-home-energy-monitor` |
-   | `DATABASE_URL` | `sqlite:////data/smart_home_energy.db` (needs a disk, see below) |
-   | `DEVIATION_THRESHOLD_PERCENT` | `10.0` |
-   | `DEFAULT_TARIFF` | `TNEB-Domestic-Monthly-Seed` |
+## 2. Deploy the backend (Render Blueprint)
 
-4. **Persistent disk**: SQLite needs writable storage. Add a Disk (mount
-   `/data`, 1 GB) on a paid instance; on Free tier the DB resets on deploy
-   (fine for demos, documented honestly).
-5. Deploy, then verify `https://<api-host>/health` -> `{"status": "ok", ...}`.
-   Tariff sets seed automatically on startup (idempotent, `verified: false`).
-6. Optional: run the seed for demo readings by adding a one-off **Shell**
-   command on a paid instance (`python seed_data.py`) or POST readings via
-   `/docs`.
+1. Push this project to its GitHub repository (it lives in the
+   `person_c_smart_home_energy/` folder of the repo).
+2. Render dashboard -> **New** -> **Blueprint** -> connect the repository.
+3. **Blueprint Path**: `person_c_smart_home_energy/render.yaml`.
+4. Review the plan (one web service `smart-home-energy-monitor`, one database `smart-home-energy-db`)
+   and fill any prompted values. Apply.
 
-## 2. Service 2 - Streamlit dashboard
+What the Blueprint configures:
 
-1. **New +** -> **Web Service** -> same repo.
-2. Settings:
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`
-3. Environment variables:
+| Setting | Value |
+|---|---|
+| Root directory | `person_c_smart_home_energy` |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| Health check | `/health` |
+| Python | `PYTHON_VERSION=3.12.8` |
 
-   | Key | Value |
-   |---|---|
-   | `API_BASE_URL` | `https://<api-host-from-step-1>` |
+Environment variables:
 
-4. Deploy and open the dashboard.
+| Key | Value | Source |
+|---|---|---|
+| `DATABASE_URL` | connection string of `smart-home-energy-db` | from database |
+| `SERVICE_NAME` | `smart-home-energy-monitor` | in Blueprint |
+| `DEFAULT_TARIFF` | `TNEB-Domestic-Monthly-Seed` | in Blueprint |
+| `DEVIATION_THRESHOLD_PERCENT` | `10.0` | in Blueprint |
 
-## 3. Wiring Person A to this app
+No secrets are committed: the database credentials exist only in Render.
 
-Copy this API's public URL into Person A's environment (both of A's
-services):
+### Verify the backend
 
+```bash
+curl https://<your-service>.onrender.com/health
 ```
-INTEGRATION_C_BASE_URL=https://<this-api-host>.onrender.com
-```
+- `status: ok`, `database: connected`, `database_backend: postgresql`.
+- `https://<your-service>.onrender.com/docs` and `/openapi.json` load.
+- `GET /tariffs` -> seeded sets with `verified: false`.
+- `GET /history?months=6` returns `months[]` and `estimate_disclaimer`
+  (this is what Person A consumes - give A this service's base URL).
+- Create a record through `/docs`, trigger **Manual Deploy -> Restart service**,
+  and confirm the record is still there (PostgreSQL persistence).
 
-A's sync then imports the most recent **actual** bill; if none exists yet it
-uses the most recent **completed month's estimate** (stable external ids
-`C:actual:{month}` / `C:estimated:{month}` prevent duplicates).
+## 3. Deploy the frontend (Streamlit Community Cloud)
 
-> Reminder: keep this API's `DEFAULT_TARIFF` verified before trusting the
-> amounts A imports - see the UNVERIFIED notes in `README.md`.
+1. <https://share.streamlit.io> -> **Create app** -> pick the repository and branch.
+2. **Main file path**: `person_c_smart_home_energy/app.py`
+   (Community Cloud installs `person_c_smart_home_energy/requirements.txt`).
+3. **Advanced settings** -> Python 3.12 -> **Secrets**:
+   ```toml
+   API_BASE_URL = "https://<your-service>.onrender.com"
+   ```
+   (template: `.streamlit/secrets.toml.example`). Optional:
+   `API_TIMEOUT_SECONDS = "60"` as an environment-style secret is not read -
+   the 60 s default already covers Render cold starts.
+4. Deploy and open every sidebar page. The caption under the title shows the
+   API URL in use. If the backend was asleep, the first page can take up to a
+   minute or show a "may be waking up" message - reload once.
 
-## 4. Verification checklist
+The frontend never touches a database; it only calls `API_BASE_URL`.
 
-- [x] `GET /health` -> `status: ok`, `database: connected`
-- [x] `GET /tariffs` -> two seeded sets, `verified: false` + honest notes
-- [x] Create an appliance, POST a reading, see `kwh` = kW x quantity x hours
-- [x] `GET /bill/estimate` -> slab breakdown with UNVERIFIED note
-- [x] `POST /bill/actual`, then `GET /bill/compare` -> D_% math + disclaimer
-- [x] `GET /history?months=6` -> most-recent-first rows
-- [x] Dashboard loads and renders the same numbers
+## 4. Free-tier caveats
 
-## 5. Free-tier caveats (stated honestly)
-
-- Free services sleep after ~15 min idle; first request wakes them
-  (~30-60 s). Person A's sync across sleeping services may need a higher
-  `INTEGRATION_TIMEOUT_SECONDS` (A defaults to 3 s, configurable).
-- Free tier has no persistent disks -> SQLite is ephemeral there.
-- `allow_origins=["*"]` CORS is deliberate for the course demo; restrict it
-  for real deployments.
+- Free Render services sleep after ~15 minutes idle; the first request takes
+  ~30-60 s.
+- `allow_origins=["*"]` CORS is intentional for the course demo (the
+  frontends call the APIs server-side). Restrict it for real use.
+- Unhandled errors return `{"detail": "Internal server error"}`; tracebacks
+  go to the Render logs only.

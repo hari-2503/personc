@@ -79,9 +79,10 @@ streamlit run app.py
 | A - Expense & Budget | 8001 | 8501 |
 
 Start all backends, then in Person A's `.env` set
-`INTEGRATION_C_BASE_URL=http://127.0.0.1:8003`. A's sync imports the most
-recent electricity bill (actual if recorded, else the last closed month's
-estimate) as a `Bills` expense.
+`ELECTRICITY_API_URL=http://127.0.0.1:8003`. A's sync imports every
+settled month of the last 6 (the actual bill if recorded, else a closed
+month's estimate) as one `Bills` expense per month, and upgrades an imported
+estimate in place once the actual bill is recorded.
 
 **Demo tip**: the seed intentionally leaves the CURRENT month without an
 actual bill, so you can demonstrate the `no_actual` path, then record the

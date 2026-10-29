@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from crud import list_appliances, months_with_data
-from database import get_db
+from database import database_backend, get_db
 from models import UsageReading
 from services.analytics import month_estimate
 
@@ -16,6 +16,7 @@ router = APIRouter(tags=["System"])
 
 @router.get("/health")
 def health(db: Session = Depends(get_db)):
+    """Liveness (always 200 while running) + database readiness field."""
     database_status = "connected"
     try:
         db.execute(text("SELECT 1"))
@@ -27,6 +28,7 @@ def health(db: Session = Depends(get_db)):
         "owner": settings.service_owner,
         "version": settings.version,
         "database": database_status,
+        "database_backend": database_backend(),
         "time": datetime.now(timezone.utc).isoformat(),
     }
 

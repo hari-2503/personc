@@ -57,7 +57,7 @@ def test_actual_bill_upsert_and_validation(client):
     created = client.post(
         "/bill/actual", json={"month": PREV_MONTH, "kwh_actual": 100.0, "amount_actual": 500.0}
     )
-    assert created.status_code == 200
+    assert created.status_code == 201
     # Upsert same month replaces the stored values.
     updated = client.post(
         "/bill/actual", json={"month": PREV_MONTH, "kwh_actual": 110.0, "amount_actual": 550.0}

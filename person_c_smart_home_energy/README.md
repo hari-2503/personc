@@ -83,7 +83,7 @@ Interactive API docs: <http://127.0.0.1:8003/docs>
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./data/smart_home_energy.db` | Own SQLite file (never shared) |
+| `DATABASE_URL` | `data/smart_home_energy.db` (SQLite) | Own database. Relative SQLite paths resolve against this folder; `postgres://`/`postgresql://` URLs (Render Postgres) are supported |
 | `APP_PORT` | `8003` | Backend port |
 | `API_BASE_URL` (frontend) | `http://127.0.0.1:8003` | Where Streamlit finds the API |
 | `DEVIATION_THRESHOLD_PERCENT` | `10.0` | D_% above which a month is flagged for investigation |
@@ -147,6 +147,36 @@ person_c_smart_home_energy/
   (amount basis when meaningful, kWh basis otherwise - documented).
 - Investigation threshold: configurable; flagged months get an actionable
   hint pointing at `GET /history?months=6`.
+
+## Tariff assumptions (read before quoting any amount)
+
+- The estimator applies **telescopic (marginal) slabs**: each unit is charged
+  at the rate of the slab it falls in. Slabs are 1-based inclusive ranges.
+- Seeded set used by default, `TNEB-Domestic-Monthly-Seed` (per calendar
+  month, fixed charge 0, `verified=false`):
+  1-50 @ 0.00 | 51-100 @ 2.35 | 101-200 @ 4.70 | 201-250 @ 6.30 |
+  251-300 @ 8.40 | 301-400 @ 9.45 | 401-500 @ 10.50 | 501+ @ 11.55 (INR/kWh).
+  It is derived from the seeded bi-monthly set (1-100 free, 101-200 @ 2.35,
+  201-400 @ 4.70, 401-500 @ 6.30, 501-600 @ 8.40, 601-800 @ 9.45,
+  801-1000 @ 10.50, 1001+ @ 11.55) by halving the unit thresholds.
+- TNEB/TANGEDCO bills domestic consumers **bi-monthly**; the monthly set is an
+  approximation chosen so estimates line up with calendar months. Switch
+  `DEFAULT_TARIFF=TNEB-Domestic-Bimonthly-Seed` to apply the bi-monthly
+  table to a calendar month's kWh instead.
+- Not modelled: electricity duty/tax, fixed/demand charges, meter rent,
+  government subsidy rules beyond the zero-rated first slab, and any tariff
+  revision after the seed was written.
+- v1.1 review (Oct 2026): the per-unit rates match those listed by several
+  third-party TNEB bill calculators, but those sources disagree on whether the
+  slabs are monthly or bi-monthly and none is an official TNERC/TANGEDCO
+  document. The seed therefore stays **UNVERIFIED** - no values were changed.
+  Before relying on amounts, compare with the current TNERC tariff order and
+  edit the `tariff_slabs` table (or `seed_data.py`), then set `verified=true`.
+- Boundary behaviour is covered by `tests/test_fixes_v11.py` (50, 51, 100,
+  101, 200, 500 and 600 units, fractional units).
+- Every estimate response carries `tariff_verified` and a note, and
+  `/history` carries `estimate_disclaimer`: **an estimate is never an
+  official electricity bill.**
 
 ## Known limitations & unverified items
 

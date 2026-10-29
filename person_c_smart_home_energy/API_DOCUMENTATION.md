@@ -66,9 +66,10 @@ Deletes the appliance AND its readings:
 Energy per reading: **E_kWh = rated_power_kw x quantity x hours_used**
 (`hours_used` = average operating hours per unit that day).
 
-### `POST /readings` -> 200 (UPSERT)
+### `POST /readings` -> 201 (created) | 200 (updated) | 404 (unknown appliance)
 Posting the same `(appliance_id, reading_date)` again updates the hours -
-the API never accumulates duplicate rows for a day.
+the API never accumulates duplicate rows for a day. (v1.0 returned 200 for
+both cases.)
 
 ```bash
 curl -X POST http://127.0.0.1:8003/readings \
@@ -99,8 +100,10 @@ Recent readings, newest first, each including computed `kwh`.
 
 ### `GET /consumption/daily`
 Three ways to call it: `?date=YYYY-MM-DD` (single day), `?start=&end=`
-(explicit range, max 92 days), or `?days=7` (rolling window). Days without
-readings are omitted - missing data is not zero usage.
+(explicit range, max 92 days), or `?days=7` (rolling window ending today; the
+default when no parameters are given). Days without readings are omitted -
+missing data is not zero usage. (v1.0 returned HTTP 500 for the rolling-window
+form; fixed in v1.1.)
 
 ```json
 {
@@ -144,7 +147,7 @@ top slab may be open-ended. Includes the full breakdown.
 Statuses: `ok` | `no_data` (zero readings -> estimated_kwh 0.0, valid zero)
 | `no_tariff` (kwh known, no tariff set found).
 
-### `POST /bill/actual` -> 200 (UPSERT per month)
+### `POST /bill/actual` -> 201 (first record for the month) | 200 (replaced)
 ```bash
 curl -X POST http://127.0.0.1:8003/bill/actual \
   -H "Content-Type: application/json" \
@@ -184,8 +187,14 @@ flag per month. **Consumed by Person A.**
    "deviation_percent": null, "needs_investigation": false},
   {"month": "2026-09", "estimated_kwh": 420.0, "actual_kwh": 412.0,
    "estimated_amount": 1369.75, "actual_amount": 1340.0,
-   "deviation_percent": 2.22, "needs_investigation": false} ]}
+   "deviation_percent": 2.22, "needs_investigation": false} ],
+ "tariff_name": "TNEB-Domestic-Monthly-Seed", "tariff_verified": false,
+ "estimate_disclaimer": "estimated_* values are computed from logged appliance usage and the configured tariff slabs; they are NOT official electricity bills. actual_* values are bills recorded by the user."}
 ```
+
+`estimated_*` and `actual_*` are separate fields and are never merged. Person A
+imports the actual amount when present, otherwise a closed month's estimate,
+and labels which one it used.
 
 ## Tariffs
 
