@@ -33,7 +33,7 @@ Status legend: `[x]` done with evidence - `[!]` done but flagged / unverified -
 - [x] Bulk-default idempotency (second run: created 0)
 - [x] `no_data` / `no_actual` / `no_estimate` status paths (valid zeros, no 500s)
 - [x] Validation: hours > 24 -> 422; bad month format -> 422; unknown appliance -> 404
-- [x] 19 tests total - `python -m pytest -q` -> `19 passed`
+- [x] 28 tests total - `python -m pytest -q` -> `28 passed`
 
 ## Integration (exposing the contract)
 

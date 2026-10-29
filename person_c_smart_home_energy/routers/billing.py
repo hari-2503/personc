@@ -2,11 +2,11 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from config import settings
-from crud import get_actual_bill, list_tariff_sets, upsert_actual_bill
+from crud import get_actual_bill, list_tariff_sets, upsert_actual_bill_tracked
 from database import get_db
 from schemas import (
     ActualBillCreate,
@@ -21,6 +21,7 @@ from schemas import (
 )
 from services.analytics import history as history_analytics
 from services.analytics import month_estimate
+from services.tariff import get_tariff_set
 
 router = APIRouter(tags=["Billing & Tariffs"])
 
@@ -59,15 +60,25 @@ def estimate_endpoint(
     )
 
 
-@router.post("/bill/actual", response_model=ActualBillOut, description="UPSERT: re-posting for the same month replaces the stored actual bill.")
-def record_actual_endpoint(payload: ActualBillCreate, db: Session = Depends(get_db)):
-    return upsert_actual_bill(
+@router.post(
+    "/bill/actual",
+    response_model=ActualBillOut,
+    status_code=status.HTTP_201_CREATED,
+    responses={200: {"description": "Existing actual bill for that month replaced"}},
+    description="UPSERT: 201 when the month's actual bill is first recorded, 200 when re-posting "
+    "for the same month replaces it.",
+)
+def record_actual_endpoint(payload: ActualBillCreate, response: Response, db: Session = Depends(get_db)):
+    bill, created = upsert_actual_bill_tracked(
         db,
         month=payload.month,
         kwh_actual=payload.kwh_actual,
         amount_actual=payload.amount_actual,
         notes=payload.notes or "",
     )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return bill
 
 
 @router.get("/bill/compare", response_model=CompareResponse)
@@ -146,7 +157,12 @@ def history_endpoint(
 ):
     """Last N calendar months (most recent first): estimate vs actual + deviation."""
     entries = history_analytics(db, months, settings.default_tariff, settings.deviation_threshold_percent)
-    return HistoryResponse(months=entries)
+    tariff = get_tariff_set(db, settings.default_tariff)
+    return HistoryResponse(
+        months=entries,
+        tariff_name=settings.default_tariff,
+        tariff_verified=tariff.verified if tariff else None,
+    )
 
 
 @router.get("/tariffs", response_model=TariffsResponse)

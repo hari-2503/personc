@@ -56,7 +56,7 @@ def test_reading_upsert_and_energy_math(client, appliance):
         "/readings",
         json={"appliance_id": appliance_id, "reading_date": DAY, "hours_used": 10.0},
     )
-    assert first.status_code == 200, first.text
+    assert first.status_code == 201, first.text  # created
     body = first.json()
     # E_kWh = 1.2 kW * 1 unit * 10 h = 12.0
     assert body["kwh"] == 12.0

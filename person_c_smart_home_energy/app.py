@@ -2,32 +2,18 @@
 
 Run:  streamlit run app.py   (API_BASE_URL defaults to http://127.0.0.1:8003)
 """
-import os
 from datetime import date, timedelta
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from ui_common import api_delete, api_get, api_post, api_put, money
+from ui_common import resolve_api_base_url, api_delete, api_get, api_post, api_put, money
 
 st.set_page_config(page_title="Smart Home Energy Monitor (C)", layout="wide")
 
 
-def _api_base_url(default: str) -> str:
-    """Resolve the backend URL: env var first (local runs / Render), then
-    Streamlit Community Cloud secrets (the Secrets editor is surfaced through
-    st.secrets), then the local default."""
-    value = os.getenv("API_BASE_URL")
-    if value:
-        return value
-    try:
-        return st.secrets.get("API_BASE_URL", default)
-    except Exception:  # no secrets file in a plain local run
-        return default
-
-
-API_BASE_URL = _api_base_url("http://127.0.0.1:8003")
+API_BASE_URL = resolve_api_base_url(st.secrets)
 
 st.title("Smart Home Electricity Monitoring & Bill Estimation")
 st.caption("Person C - Hariharan S (23MID0182) | CSI3007 Advanced Python Programming | "

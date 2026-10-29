@@ -2,11 +2,21 @@
 from datetime import date
 from typing import Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from models import ActualBill, Appliance, TariffSet, TariffSlab, UsageReading
+
+
+# ------------------------------------------------------------------ months
+def month_bounds(month: str) -> tuple[date, date]:
+    """[first day, first day of next month) for "YYYY-MM". Range filters work
+    on SQLite and PostgreSQL alike (strftime() is SQLite-only)."""
+    year, mon = (int(part) for part in month.split("-"))
+    start = date(year, mon, 1)
+    end = date(year + 1, 1, 1) if mon == 12 else date(year, mon + 1, 1)
+    return start, end
 
 
 # --------------------------------------------------------------- appliances
@@ -88,25 +98,35 @@ def list_readings(
 
 
 def readings_for_month(db: Session, month: str) -> list[UsageReading]:
+    start, end = month_bounds(month)
     return list(
         db.scalars(
             select(UsageReading)
             .join(Appliance)
-            .where(func.strftime("%Y-%m", UsageReading.reading_date) == month)
+            .where(UsageReading.reading_date >= start, UsageReading.reading_date < end)
         ).all()
     )
 
 
 def months_with_data(db: Session) -> list[str]:
-    rows = db.execute(
-        select(func.strftime("%Y-%m", UsageReading.reading_date)).distinct()
-    ).all()
-    return sorted(row[0] for row in rows)
+    rows = db.execute(select(UsageReading.reading_date).distinct()).all()
+    return sorted({row[0].strftime("%Y-%m") for row in rows})
 
 
 # ------------------------------------------------------------------ billing
 def upsert_actual_bill(db: Session, *, month: str, kwh_actual: float, amount_actual: float, notes: str) -> ActualBill:
+    bill, _created = upsert_actual_bill_tracked(
+        db, month=month, kwh_actual=kwh_actual, amount_actual=amount_actual, notes=notes
+    )
+    return bill
+
+
+def upsert_actual_bill_tracked(
+    db: Session, *, month: str, kwh_actual: float, amount_actual: float, notes: str
+) -> tuple[ActualBill, bool]:
+    """Create or replace the actual bill for `month`. Returns (bill, created)."""
     bill = db.scalar(select(ActualBill).where(ActualBill.month == month))
+    created = bill is None
     if bill is None:
         bill = ActualBill(month=month, kwh_actual=kwh_actual, amount_actual=amount_actual, notes=notes or "")
         db.add(bill)
@@ -116,7 +136,7 @@ def upsert_actual_bill(db: Session, *, month: str, kwh_actual: float, amount_act
         bill.notes = notes or bill.notes
     db.commit()
     db.refresh(bill)
-    return bill
+    return bill, created
 
 
 def get_actual_bill(db: Session, month: str) -> Optional[ActualBill]:

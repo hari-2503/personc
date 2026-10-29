@@ -172,6 +172,13 @@ class HistoryEntry(BaseModel):
 
 class HistoryResponse(BaseModel):
     months: list[HistoryEntry]
+    # Additive in v1.1: lets consumers (Person A) label estimates honestly.
+    tariff_name: Optional[str] = None
+    tariff_verified: Optional[bool] = None
+    estimate_disclaimer: str = (
+        "estimated_* values are computed from logged appliance usage and the configured tariff "
+        "slabs; they are NOT official electricity bills. actual_* values are bills recorded by the user."
+    )
 
 
 # ------------------------------------------------------------------ tariffs
