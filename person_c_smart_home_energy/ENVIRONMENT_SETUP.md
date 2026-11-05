@@ -91,7 +91,7 @@ actual bill, so you can demonstrate the `no_actual` path, then record the
 ## Tests
 
 ```bash
-python -m pytest -q          # 19 tests, uses a throwaway SQLite file
+python -m pytest -q          # 28 tests, uses a throwaway SQLite file
 ```
 
 ## Troubleshooting

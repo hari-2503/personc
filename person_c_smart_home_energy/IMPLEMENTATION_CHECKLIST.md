@@ -40,7 +40,7 @@ Status legend: `[x]` done with evidence - `[!]` done but flagged / unverified -
 - [x] `GET /history?months=6` is the stable endpoint Person A consumes
 - [x] No shared database files - C never opens A's or B's data
 - [x] Live smoke test: A imported C's actual bill for 2026-09 (1250.00) as a
-      Bills expense; re-sync imported 0 - see `docs/FINAL_VERIFICATION_REPORT.md`
+      Bills expense; re-sync imported 0 - see the checklist section above
 - [x] Streamlit boot check: `/_stcore/health` -> ok
 
 ## Frontend (Streamlit)

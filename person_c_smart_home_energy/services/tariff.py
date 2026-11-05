@@ -55,10 +55,3 @@ def estimate_amount(
     fixed = round(float(tariff_set.fixed_charge), 2)
     return energy, fixed, breakdown
 
-
-def deviation(amount_actual: float, amount_estimated: float) -> float:
-    """D = B_actual - B_estimated; D_% = |D| / B_actual * 100 (spec formula)."""
-    d = amount_actual - amount_estimated
-    if amount_actual == 0:
-        return 0.0 if d == 0 else float("inf")
-    return round(abs(d) / abs(amount_actual) * 100.0, 2)

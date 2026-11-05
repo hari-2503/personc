@@ -59,7 +59,7 @@ slabs**, and compares estimated vs actual bills with the deviation signal
 | Backend   | Python 3.12, FastAPI, Pydantic v2 |
 | Database  | SQLite via SQLAlchemy 2 (own file: `data/smart_home_energy.db`) |
 | Frontend  | Streamlit + Plotly (pure REST client) |
-| Testing   | pytest + FastAPI TestClient (19 tests) |
+| Testing   | pytest + FastAPI TestClient (28 tests) |
 | Deploy    | Render (see `RENDER_DEPLOYMENT.md`) |
 
 ## Quickstart
@@ -190,13 +190,33 @@ person_c_smart_home_energy/
 - Solar/net-metering, duty charges and subsidies beyond the free slab are out
   of scope.
 
-## Git quickstart (GitHub-ready)
+## Deployment URLs (verified 2026-11-05)
+
+| Service | URL | Status |
+|---|---|---|
+| Backend (Render) | https://smart-home-energy-api.onrender.com/health | HTTP 200, `status: ok` |
+| Frontend (Streamlit Cloud) | https://personc-ehwhch8swvjfrmuybqe2ry.streamlit.app/ | Deployed (viewer sign-in may be required) |
+
+Deployment note: `/health` currently reports `database_backend: sqlite`, i.e.
+`DATABASE_URL` is not yet set on Render and data lives on the ephemeral
+free-tier filesystem (wiped on redeploy). Set `DATABASE_URL` from the
+Blueprint's `smart-home-energy-db` (or a manual Postgres) for persistence.
+
+## Verified demo evidence (2026-11-05)
+
+- Test suite: `python -m pytest -q` -> **28 passed** (12 API + 7 billing +
+  9 v1.1 regression tests).
+- Live contract check: `GET /history?months=6` on the deployed Render service
+  returns the documented 6-month payload, and a local Person A instance
+  classified the deployed C as `available` and completed a sync against it
+  without protocol errors.
+
+## Git workflow (this repository)
 
 ```bash
-git init
-git add .
-git commit -m "CSI3007 Person C: smart home energy monitor"
-git branch -M main
-git remote add origin https://github.com/<your-user>/csi3007-smart-home-energy-monitor.git
-git push -u origin main
+git clone https://github.com/hari-2503/personc.git
+cd personc
+git checkout -b <feature-branch>
+# ... changes ...
+git add . && git commit -m "..." && git push origin <feature-branch>
 ```

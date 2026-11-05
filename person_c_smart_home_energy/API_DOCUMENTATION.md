@@ -18,7 +18,8 @@
   "status": "ok",
   "service": "smart-home-energy-monitor",
   "owner": "Person C - Hariharan S (23MID0182)",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "database_backend": "sqlite",
   "database": "connected",
   "time": "2026-10-28T13:34:56.532990+00:00"
 }
@@ -29,7 +30,7 @@ Self-describing status for consumers (Person A polls `/history?months=6`):
 
 ```json
 {
-  "service": "smart-home-energy-monitor", "version": "1.0.0", "status": "ok",
+  "service": "smart-home-energy-monitor", "version": "1.1.0", "status": "ok",
   "appliances_count": 8, "active_appliances_count": 8, "readings_count": 480,
   "months_with_data": ["2026-08", "2026-09", "2026-10"],
   "default_tariff": "TNEB-Domestic-Monthly-Seed",

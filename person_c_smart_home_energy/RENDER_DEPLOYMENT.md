@@ -24,8 +24,8 @@ database and injects its connection string as `DATABASE_URL`
   before it expires.
 - Paid alternative: an instance with a disk mounted at `/var/data` and
   `DATABASE_URL=sqlite:////var/data/<name>.db` (remove the `databases:` block).
-- Tables are created on startup; there is no destructive reset. The only
-  schema change in v1.1 is additive (A's `expenses.import_basis`).
+- Tables are created on startup; there is no destructive reset. There are
+  no manual migrations to run.
 
 ## 2. Deploy the backend (Render Blueprint)
 

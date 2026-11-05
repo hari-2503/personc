@@ -16,7 +16,7 @@ DATABASE_URL handling:
 import os
 from pathlib import Path
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -58,21 +58,6 @@ Base = declarative_base()
 def database_backend() -> str:
     """Short, credential-free label for /health ("sqlite" or "postgresql")."""
     return "sqlite" if IS_SQLITE else engine.dialect.name
-
-
-def add_missing_columns(table: str, columns: dict[str, str], bind=None) -> list[str]:
-    """Additive, non-destructive migration: ALTER TABLE ... ADD COLUMN for any
-    column the ORM model has gained since the table was first created.
-    Existing rows are preserved (new columns are NULL). Returns added names."""
-    bind = bind or engine
-    existing = {col["name"] for col in inspect(bind).get_columns(table)}
-    added = []
-    with bind.begin() as conn:
-        for name, ddl_type in columns.items():
-            if name not in existing:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl_type}"))
-                added.append(name)
-    return added
 
 
 def get_db():
